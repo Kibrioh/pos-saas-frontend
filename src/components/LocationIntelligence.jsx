@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { apiFetch } from "../api/client";
+import { loadGoogleMapsLibrary, resolveGooglePlaceCoordinates } from "../api/googlePlaces";
 import { formatKsh, toKsh } from "../utils/formatPrice";
 
 function dateInTimezone(date, timezone = "Africa/Nairobi") {
@@ -26,20 +27,159 @@ function formatPercent(value) {
   return value == null ? "—" : `${Number(value).toFixed(1)}%`;
 }
 
-function BranchMap({ branches }) {
+function BranchMap({ branches, hasLoaded }) {
   const mapElement = useRef(null);
+  const resolvedPlaceCoordinates = useRef(new Map());
+  const [mapError, setMapError] = useState("");
+  const [placeResolutionStatus, setPlaceResolutionStatus] = useState("idle");
+  const [resolvedBranches, setResolvedBranches] = useState(branches);
+  const useGoogleMaps = Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
+  const unresolvedGooglePlaces = branches.some((branch) => (
+    branch.google_place_id
+    && (branch.latitude == null || branch.longitude == null)
+    && !resolvedPlaceCoordinates.current.has(branch.google_place_id)
+  ));
+  useEffect(() => {
+    let active = true;
+    const branchesWithCachedCoordinates = branches.map((branch) => {
+      if (branch.latitude != null && branch.longitude != null) return branch;
+      const cached = resolvedPlaceCoordinates.current.get(branch.google_place_id);
+      return cached ? { ...branch, ...cached } : branch;
+    });
+    setResolvedBranches(branchesWithCachedCoordinates);
+    const branchesToResolve = branches.filter((branch) => (
+      branch.google_place_id
+      && (branch.latitude == null || branch.longitude == null)
+      && !resolvedPlaceCoordinates.current.has(branch.google_place_id)
+    ));
+    if (!branchesToResolve.length) {
+      setPlaceResolutionStatus("idle");
+      return () => { active = false; };
+    }
+    setPlaceResolutionStatus("loading");
+
+    Promise.all(branchesToResolve.map(async (branch) => {
+      try {
+        const coordinates = await resolveGooglePlaceCoordinates(branch.google_place_id);
+        return [String(branch.branch_id ?? branch.id), coordinates, !coordinates];
+      } catch {
+        return [String(branch.branch_id ?? branch.id), null, true];
+      }
+    })).then((resolved) => {
+      if (!active) return;
+      resolved.forEach(([, coordinates, failed], index) => {
+        if (!failed && coordinates) {
+          resolvedPlaceCoordinates.current.set(branchesToResolve[index].google_place_id, coordinates);
+        }
+      });
+      const coordinatesByBranch = new Map(resolved.map(([branchId, coordinates]) => [branchId, coordinates]));
+      setResolvedBranches(branches.map((branch) => {
+        const [coordinates] = coordinatesByBranch.get(String(branch.branch_id ?? branch.id)) || [];
+        return coordinates ? { ...branch, ...coordinates } : branch;
+      }));
+      setPlaceResolutionStatus(resolved.some(([, , failed]) => failed) ? "error" : "idle");
+    });
+
+    return () => { active = false; };
+  }, [branches]);
+
   const locations = useMemo(
-    () => branches.filter((branch) => (
+    () => resolvedBranches.filter((branch) => (
       branch.latitude != null
       && branch.longitude != null
       && Number.isFinite(Number(branch.latitude))
       && Number.isFinite(Number(branch.longitude))
     )),
-    [branches]
+    [resolvedBranches]
   );
 
   useEffect(() => {
-    if (!mapElement.current) return undefined;
+    if (!mapElement.current || !hasLoaded || (unresolvedGooglePlaces && placeResolutionStatus !== "error")) {
+      return undefined;
+    }
+
+    if (useGoogleMaps) {
+      let disposed = false;
+      const markers = [];
+      setMapError("");
+
+      Promise.all([
+        loadGoogleMapsLibrary("maps"),
+        loadGoogleMapsLibrary("marker"),
+        loadGoogleMapsLibrary("core"),
+      ])
+        .then(([googleMaps, markerLibrary, coreLibrary]) => {
+          if (disposed || !mapElement.current) return;
+          setMapError("");
+
+          const map = new googleMaps.Map(mapElement.current, {
+            center: { lat: -1.286389, lng: 36.817223 },
+            zoom: 6,
+            mapTypeControl: false,
+            streetViewControl: false,
+          });
+          const maxSales = Math.max(...locations.map((branch) => toKsh(branch.net_sales)), 1);
+          const bounds = new googleMaps.LatLngBounds();
+          const infoWindow = new googleMaps.InfoWindow();
+          locations.forEach((branch) => {
+            const position = { lat: Number(branch.latitude), lng: Number(branch.longitude) };
+            bounds.extend(position);
+            const sales = Math.max(0, toKsh(branch.net_sales ?? 0));
+            const radius = 8 + Math.sqrt(sales / maxSales) * 9;
+            const marker = new markerLibrary.Marker({
+              map,
+              position,
+              title: branch.branch_name || branch.name || "Shop",
+              icon: {
+                path: coreLibrary.SymbolPath.CIRCLE,
+                scale: radius,
+                fillColor: branch.is_active ? "#2563eb" : "#64748b",
+                fillOpacity: 0.88,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              },
+            });
+            markers.push(marker);
+
+            const popup = document.createElement("div");
+            const title = document.createElement("strong");
+            title.textContent = branch.branch_name || branch.name || "Shop";
+            popup.append(title);
+            const details = [
+              branch.is_active ? "Active shop" : "Inactive shop",
+              branch.location,
+              branch.net_sales != null && `Net sales: ${formatKsh(toKsh(branch.net_sales))}`,
+              branch.transaction_count != null && `Transactions: ${branch.transaction_count}`,
+              branch.low_stock_product_count != null && `Low stock products: ${branch.low_stock_product_count}`,
+              branch.out_of_stock_product_count != null && `Out of stock products: ${branch.out_of_stock_product_count}`,
+            ].filter(Boolean);
+            details.forEach((text) => {
+              const line = document.createElement("div");
+              line.textContent = text;
+              popup.append(line);
+            });
+            marker.addListener("click", () => {
+              infoWindow.setContent(popup);
+              infoWindow.open({ map, anchor: marker });
+            });
+          });
+
+          if (locations.length === 1) {
+            map.setCenter({ lat: Number(locations[0].latitude), lng: Number(locations[0].longitude) });
+            map.setZoom(13);
+          } else if (locations.length > 1) {
+            map.fitBounds(bounds, 36);
+          }
+        })
+        .catch((error) => {
+          if (!disposed) setMapError(error.message || "Google Maps could not be loaded.");
+        });
+
+      return () => {
+        disposed = true;
+        markers.forEach((marker) => marker.setMap(null));
+      };
+    }
 
     const map = L.map(mapElement.current, { scrollWheelZoom: false });
     const tileUrl = import.meta.env.VITE_MAP_TILE_URL
@@ -98,18 +238,33 @@ function BranchMap({ branches }) {
       window.clearTimeout(resizeTimer);
       map.remove();
     };
-  }, [locations]);
+  }, [hasLoaded, locations, placeResolutionStatus, unresolvedGooglePlaces, useGoogleMaps]);
 
   return (
     <>
-      {!locations.length && (
+      {mapError && (
+        <div className="location-map-notice" role="alert">
+          <strong>Google Maps is unavailable.</strong>
+          <span>{mapError} Check the browser key, its website restrictions, and that the Maps JavaScript API is enabled.</span>
+        </div>
+      )}
+      {(placeResolutionStatus === "loading" || (unresolvedGooglePlaces && placeResolutionStatus !== "error")) && (
+        <div className="location-map-notice" role="status">Resolving saved Google Maps locations…</div>
+      )}
+      {placeResolutionStatus === "error" && (
+        <div className="location-map-notice" role="alert">
+          <strong>Some saved Google locations could not be resolved.</strong>
+          <span>Check that the Places API (New) is enabled and the browser key is available.</span>
+        </div>
+      )}
+      {!locations.length && !unresolvedGooglePlaces && placeResolutionStatus === "idle" && (
         <div className="location-map-notice" role="status">
           <strong>No shop coordinates yet.</strong>
           <span>Use “Branch location” in the manager sidebar to add latitude and longitude. The map is centered on Kenya until shops are mapped.</span>
         </div>
       )}
       <div
-        className="location-map"
+        className={`location-map${mapError ? " location-map-unavailable" : ""}`}
         ref={mapElement}
         role="application"
         aria-label="Map of shop locations, with marker sizes based on net sales"
@@ -165,6 +320,7 @@ function LocationIntelligence() {
             ? {
               ...branch,
               location: updatedBranch.location,
+              google_place_id: updatedBranch.google_place_id,
               latitude: updatedBranch.latitude,
               longitude: updatedBranch.longitude,
             }
@@ -193,7 +349,7 @@ function LocationIntelligence() {
   };
 
   const summary = report?.summary;
-  const mapBranches = report ? report.branches : branchLocations;
+  const mapBranches = report ? report.branches : loading ? [] : branchLocations;
 
   return (
     <main className="location-page">
@@ -226,7 +382,7 @@ function LocationIntelligence() {
             <p>Each marker shows a shop. Blue marks active shops, gray marks inactive shops, and larger markers indicate higher net sales. Select a marker for shop details.</p>
           </div>
         </div>
-        <BranchMap branches={mapBranches} />
+            <BranchMap branches={mapBranches} hasLoaded={!loading} />
       </section>
 
       {report && (

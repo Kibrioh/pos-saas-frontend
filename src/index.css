@@ -344,6 +344,88 @@ p {
   grid-column: 1 / -1;
 }
 
+.manager-google-location {
+  position: relative;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.manager-google-location > input {
+  width: 100%;
+}
+
+.manager-geocode-status,
+.manager-geocode-error {
+  display: block;
+  margin-top: 4px;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.manager-geocode-error {
+  color: #b91c1c;
+}
+
+.manager-place-suggestions {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  z-index: 30;
+  width: 100%;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: white;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
+}
+
+.manager-place-suggestions ul {
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+
+.manager-place-suggestions button {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: white;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+}
+
+.manager-place-suggestions button:hover,
+.manager-place-suggestions button:focus-visible {
+  background: #f1f5f9;
+  outline: none;
+}
+
+.manager-google-attribution {
+  border-top: 1px solid #e2e8f0;
+  padding: 4px 8px;
+  color: #5e5e5e;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: right;
+}
+
+.manager-google-attribution-inline {
+  display: block;
+  margin-top: 4px;
+  color: #5e5e5e;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: right;
+}
+
 .manager-coordinate-help {
   grid-column: 1 / -1;
   color: #475569;
@@ -566,6 +648,10 @@ p {
   border-radius: 9px;
   background: #e2e8f0;
   z-index: 0;
+}
+
+.location-map-unavailable {
+  visibility: hidden;
 }
 
 .location-map-notice {

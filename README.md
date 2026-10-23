@@ -147,8 +147,24 @@ Use a browser-safe key restricted to this domain if the provider supports it.
 OpenStreetMap's public tile service is best-effort and has no service-level
 agreement; use a hosted provider for production SaaS traffic. See the
 [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
-Branch coordinates can be entered in the manager header under **Branch location**.
-Automatic address geocoding is not configured yet.
+Managers can search for a branch address in **Add branch** or **Branch location**
+and choose a Google Maps suggestion to fill its coordinates. They can also enter
+latitude and longitude manually. To enable suggestions, create a
+Google Maps Platform project with billing enabled, enable the Maps JavaScript API
+and Places API (New), and set a browser key in the frontend environment before
+building:
+
+    VITE_GOOGLE_MAPS_API_KEY=YOUR_BROWSER_KEY
+
+Restrict the key to the frontend's website origins and to the Maps JavaScript
+API and Places API (New). The location report uses Google Maps when this key is
+configured, and keeps the existing OpenStreetMap map available when the app is
+using manual coordinates without Google. For Google-selected locations, the
+app stores the Place ID and resolves coordinates when the form or map needs
+them; it stores manually entered coordinates directly. In production, set the
+variable in the frontend hosting service and redeploy. Without the key, manual
+address and coordinate entry continues to work. Google Maps usage can incur
+charges; set quotas and a budget alert in Google Cloud.
 
 ### Logging in
 
