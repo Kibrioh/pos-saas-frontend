@@ -270,6 +270,47 @@ p {
   white-space: nowrap;
 }
 
+.manager-branch-picker,
+.manager-add-branch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #d1d5db;
+}
+
+.manager-branch-picker select,
+.manager-add-branch input {
+  min-width: 110px;
+  max-width: 150px;
+  padding: 7px 8px;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+}
+
+.manager-add-branch input {
+  width: 105px;
+  min-width: 0;
+}
+
+.manager-add-branch button {
+  padding: 8px 10px;
+}
+
+.manager-branch-error {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.manager-add-branch {
+  position: relative;
+}
+
 .manager-user button {
   padding: 9px 15px;
   border: none;
@@ -307,6 +348,7 @@ p {
   .manager-user {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
   }
 }
 /* ================================

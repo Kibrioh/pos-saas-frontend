@@ -29,11 +29,11 @@ goods, and the software that supports that transaction. A modern POS:
 
 | Area | Status |
 |------|--------|
-| Product catalogue | Done (loaded from the backend) |
+| Product catalogue | Done (loaded after sign-in for the active branch) |
 | Search & filtering | Done |
 | Cart & sale calculation | Done |
 | Sale completion | Done (sent to the backend, which checks stock and prices) |
-| Authentication & roles | Done (real login with JWT tokens) |
+| Authentication & roles | Done (tenant and branch scoped JWT requests) |
 | Manager dashboard, sales, cashiers, products pages | Done (backend) |
 | Receipt printing | In progress |
 | Categories, order history, and stock ledger | Loaded from the backend database |
@@ -42,13 +42,13 @@ goods, and the software that supports that transaction. A modern POS:
 
 ## How it connects to the backend
 
-All requests go through `src/api/client.js`. It adds the login token to every
-request and turns server errors into readable messages.
+All requests go through `src/api/client.js`. It adds the login token and
+selected branch to requests and turns server errors into readable messages.
 
 | Screen | What it does with the backend |
 |--------|-------------------------------|
-| Login | `POST /api/auth/login`; the token is saved in the browser and removed on logout |
-| Product list and category filters | `GET /api/products` and `GET /api/categories`, loaded from the database when the app starts |
+| Login | `POST /api/auth/login`; business sign-up creates the first manager and default branch; the token is saved in the browser and removed on logout |
+| Product list and category filters | `GET /api/products` and `GET /api/categories`, loaded after authentication; managers can switch active branches |
 | Checkout | `POST /api/sales` with product ids and quantities only. The server checks stock, uses its own prices, and the receipt is built from the server's reply. If the server refuses (for example, not enough stock), its message is shown and the cart stays as it is. |
 | Order history | `GET /api/sales/mine` for a cashier; `GET /api/sales` for a manager |
 | Stock ledger | `GET /api/stock/movements` |
@@ -196,8 +196,9 @@ Modules under `src/utils/` are small helpers used across the app.
 - Fixed USD to KSh rate (130): one constant keeps conversion in one place.
 - Stock changes from the manager page go through `POST /api/stock/adjust`, so
   each change leaves a stock movement in the database.
-- The login token is kept in localStorage under `techpoint_token` and removed
-  on logout.
+- The login token and manager's active branch id are kept in localStorage and
+  removed on logout. Protected API requests are scoped to the signed-in
+  business; branch inventory and sales use the selected branch.
 
 ## Known issues
 

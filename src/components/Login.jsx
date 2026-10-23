@@ -10,6 +10,7 @@ const passwordMeetsRequirements = (password) =>
 function Login({ onLogin }) {
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,8 +23,8 @@ function Login({ onLogin }) {
     const cleanUsername = username.trim();
 
     if (mode === "signup") {
-      if (!name.trim() || !cleanUsername || !password || !confirmPassword) {
-        setError("Please fill in all manager account details.");
+      if (!businessName.trim() || !name.trim() || !cleanUsername || !password || !confirmPassword) {
+        setError("Please enter your business name and complete all manager account details.");
         return;
       }
 
@@ -51,7 +52,7 @@ function Login({ onLogin }) {
     setSaving(true);
     try {
       const user = mode === "signup"
-        ? await registerManager(name.trim(), cleanUsername, password)
+        ? await registerManager(businessName.trim(), name.trim(), cleanUsername, password)
         : await login(cleanUsername, password);
       setError("");
       onLogin(user);
@@ -103,6 +104,23 @@ function Login({ onLogin }) {
         </div>
 
         <form onSubmit={handleSubmit}>
+          {mode === "signup" && (
+            <div className="login-field">
+              <label htmlFor="business-name">Business name</label>
+              <input
+                id="business-name"
+                type="text"
+                value={businessName}
+                onChange={(e) => {
+                  setBusinessName(e.target.value);
+                  setError("");
+                }}
+                placeholder="Enter your business name"
+                autoComplete="organization"
+              />
+            </div>
+          )}
+
           {mode === "signup" && (
             <div className="login-field">
               <label htmlFor="manager-name">Full name</label>

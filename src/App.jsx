@@ -27,7 +27,7 @@ import {
 
 import { getProducts } from "./api/products";
 import { getCategories } from "./api/categories";
-import { apiFetch, clearToken } from "./api/client";
+import { apiFetch, clearToken, getToken } from "./api/client";
 import { cartReducer } from "./cart/cartReducer";
 import {
   formatKsh,
@@ -61,11 +61,43 @@ function App() {
   const [categoryError, setCategoryError] = useState(null);
 
   const [currentUser, setCurrentUser] = useState(null);
+  const [sessionReady, setSessionReady] = useState(false);
 
-  // Products and category names come from the backend database.
+  // Restore a saved session before making tenant data requests.
   useEffect(() => {
     let isMounted = true;
+    if (!getToken()) {
+      setSessionReady(true);
+      return () => { isMounted = false; };
+    }
 
+    apiFetch("/auth/me")
+      .then(({ user }) => {
+        if (!isMounted) return;
+        setCurrentUser(user);
+        navigate(user.role === "manager" ? "/manager" : "/");
+      })
+      .catch(() => {
+        clearToken();
+      })
+      .finally(() => {
+        if (isMounted) setSessionReady(true);
+      });
+
+    return () => { isMounted = false; };
+  }, [navigate]);
+
+  // Load the signed-in user's selected branch catalogue.
+  useEffect(() => {
+    let isMounted = true;
+    if (!currentUser) {
+      setProducts([]);
+      setCategories([]);
+      setLoading(false);
+      return () => { isMounted = false; };
+    }
+
+    setLoading(true);
     Promise.allSettled([getProducts(), getCategories()])
       .then(([productResult, categoryResult]) => {
         if (!isMounted) return;
@@ -91,7 +123,7 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUser?.id, currentUser?.active_branch_id]);
 
   /*
     Each cashier has their own cart.
@@ -110,6 +142,7 @@ function App() {
   const [managerSalesRevision, setManagerSalesRevision] = useState(0);
 
   const receiptRef = useRef(null);
+  const pendingCheckoutRequest = useRef(null);
 
   useEffect(() => {
     if (currentUser?.role !== "cashier") {
@@ -211,7 +244,10 @@ function App() {
         carts[user.username] ?? [],
     }));
 
-    setCurrentUser(user);
+    setCurrentUser({
+      ...user,
+      active_branch_id: user.active_branch_id || user.branch_id,
+    });
     setSale(null);
     setCheckoutOpen(false);
     setCheckoutError("");
@@ -240,6 +276,7 @@ function App() {
     setCategory("all");
     setView("home");
     clearToken();
+    pendingCheckoutRequest.current = null;
     setCurrentUser(null);
 
     navigate("/");
@@ -540,25 +577,40 @@ function App() {
       return false;
     }
     let serverSale;
+    const requestBody = {
+      payment_method: paymentMethod,
+      amount_tendered: paymentMethod === "cash"
+        ? Number(amountTenderedKsh) / USD_TO_KSH
+        : null,
+      items: cart.map((item) => ({
+        product_id: Number(item.id),
+        quantity: item.quantity,
+      })),
+    };
+    const requestSignature = JSON.stringify({
+      ...requestBody,
+      amount_tendered_ksh: paymentMethod === "cash" ? Number(amountTenderedKsh) : null,
+    });
+    if (pendingCheckoutRequest.current?.signature !== requestSignature) {
+      pendingCheckoutRequest.current = {
+        signature: requestSignature,
+        key: globalThis.crypto?.randomUUID?.()
+          || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      };
+    }
 
     try {
       serverSale = await apiFetch("/sales", {
         method: "POST",
-        body: JSON.stringify({
-          payment_method: paymentMethod,
-          amount_tendered: paymentMethod === "cash"
-            ? Number(amountTenderedKsh) / USD_TO_KSH
-            : null,
-          items: cart.map((item) => ({
-            product_id: Number(item.id),
-            quantity: item.quantity,
-          })),
-        }),
+        headers: { "Idempotency-Key": pendingCheckoutRequest.current.key },
+        body: JSON.stringify(requestBody),
       });
     } catch (err) {
       setCheckoutError(err.message);
       return false;
     }
+
+    pendingCheckoutRequest.current = null;
 
     setCashierShiftRefreshKey((current) => current + 1);
 
@@ -914,6 +966,10 @@ function App() {
   /*
     LOGIN SCREEN
   */
+  if (!sessionReady) {
+    return <div className="login-loading" role="status">Restoring your session…</div>;
+  }
+
   if (!currentUser) {
     return (
       <Login
