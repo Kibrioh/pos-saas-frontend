@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || "https://pos-backend-egns.onrender.com/api").replace(/\/$/, "");
+const BASE_URL = (import.meta.env.VITE_API_URL || "https://pos-saas-backend-jnyb.onrender.com/api").replace(/\/$/, "");
 const TOKEN_KEY = "techpoint_token";
 const BRANCH_KEY = "techpoint_branch_id";
 
