@@ -23,6 +23,9 @@ function BranchLocationEditor({ branch, onSaved }) {
         }),
       });
       onSaved(result.branch);
+      window.dispatchEvent(new CustomEvent("techpoint:branch-location-updated", {
+        detail: result.branch,
+      }));
       setSaved(true);
     } catch (requestError) {
       setError(requestError.message);
@@ -122,45 +125,22 @@ function ManagerNav({ user, onLogout }) {
   };
 
   return (
-    <header className="manager-header">
+    <aside className="manager-sidebar" aria-label="Manager navigation and branch settings">
       <div className="manager-brand">
         <h1>TechPoint</h1>
         <p>{user.business?.name || "Manager Portal"}</p>
       </div>
 
-     <nav className="manager-nav">
-  <NavLink to="/manager">
-    Dashboard
-  </NavLink>
-
-  <NavLink to="/manager/sales">
-    Sales
-  </NavLink>
-
-  <NavLink to="/manager/products">
-    Products & Inventory
-  </NavLink>
-
-  <NavLink to="/manager/purchasing">
-    Purchasing
-  </NavLink>
-
-  <NavLink to="/manager/shifts">
-    Shifts
-  </NavLink>
-
-  <NavLink to="/manager/locations">
-    Shops & map
-  </NavLink>
-
-  <NavLink to="/manager/audit">
-    Audit
-  </NavLink>
-
-  <NavLink to="/manager/cashiers">
-    Cashiers
-  </NavLink>
-</nav>
+      <nav className="manager-nav" aria-label="Manager sections">
+        <NavLink to="/manager">Dashboard</NavLink>
+        <NavLink to="/manager/sales">Sales</NavLink>
+        <NavLink to="/manager/products">Products &amp; Inventory</NavLink>
+        <NavLink to="/manager/purchasing">Purchasing</NavLink>
+        <NavLink to="/manager/shifts">Shifts</NavLink>
+        <NavLink to="/manager/locations">Shops &amp; map</NavLink>
+        <NavLink to="/manager/audit">Audit</NavLink>
+        <NavLink to="/manager/cashiers">Cashiers</NavLink>
+      </nav>
 
       <div className="manager-user">
         <span>Welcome, {user.username}</span>
@@ -241,7 +221,7 @@ function ManagerNav({ user, onLogout }) {
           Logout
         </button>
       </div>
-    </header>
+    </aside>
   );
 }
 

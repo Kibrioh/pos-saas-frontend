@@ -29,12 +29,17 @@ function formatPercent(value) {
 function BranchMap({ branches }) {
   const mapElement = useRef(null);
   const locations = useMemo(
-    () => branches.filter((branch) => branch.latitude != null && branch.longitude != null),
+    () => branches.filter((branch) => (
+      branch.latitude != null
+      && branch.longitude != null
+      && Number.isFinite(Number(branch.latitude))
+      && Number.isFinite(Number(branch.longitude))
+    )),
     [branches]
   );
 
   useEffect(() => {
-    if (!mapElement.current || !locations.length) return undefined;
+    if (!mapElement.current) return undefined;
 
     const map = L.map(mapElement.current, { scrollWheelZoom: false });
     const tileUrl = import.meta.env.VITE_MAP_TILE_URL
@@ -50,7 +55,7 @@ function BranchMap({ branches }) {
     locations.forEach((branch) => {
       const point = [Number(branch.latitude), Number(branch.longitude)];
       bounds.push(point);
-      const sales = Math.max(0, toKsh(branch.net_sales));
+      const sales = Math.max(0, toKsh(branch.net_sales ?? 0));
       const radius = 8 + Math.sqrt(sales / maxSales) * 9;
       const marker = L.circleMarker(point, {
         radius,
@@ -62,15 +67,15 @@ function BranchMap({ branches }) {
 
       const popup = document.createElement("div");
       const title = document.createElement("strong");
-      title.textContent = branch.branch_name;
+      title.textContent = branch.branch_name || branch.name || "Shop";
       popup.append(title);
       const details = [
-        branch.is_active ? "Active branch" : "Inactive branch",
+        branch.is_active ? "Active shop" : "Inactive shop",
         branch.location,
-        `Net sales: ${formatKsh(toKsh(branch.net_sales))}`,
-        `Transactions: ${branch.transaction_count}`,
-        `Low stock products: ${branch.low_stock_product_count}`,
-        `Out of stock products: ${branch.out_of_stock_product_count}`,
+        branch.net_sales != null && `Net sales: ${formatKsh(toKsh(branch.net_sales))}`,
+        branch.transaction_count != null && `Transactions: ${branch.transaction_count}`,
+        branch.low_stock_product_count != null && `Low stock products: ${branch.low_stock_product_count}`,
+        branch.out_of_stock_product_count != null && `Out of stock products: ${branch.out_of_stock_product_count}`,
       ].filter(Boolean);
       details.forEach((text) => {
         const line = document.createElement("div");
@@ -82,8 +87,10 @@ function BranchMap({ branches }) {
 
     if (bounds.length === 1) {
       map.setView(bounds[0], 13);
-    } else {
+    } else if (bounds.length > 1) {
       map.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
+    } else {
+      map.setView([-1.286389, 36.817223], 6);
     }
     const resizeTimer = window.setTimeout(() => map.invalidateSize(), 0);
 
@@ -93,22 +100,21 @@ function BranchMap({ branches }) {
     };
   }, [locations]);
 
-  if (!locations.length) {
-    return (
-      <div className="location-map-empty">
-        <strong>No branches have coordinates yet.</strong>
-        <span>Open “Branch location” in the manager header to enter latitude and longitude.</span>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="location-map"
-      ref={mapElement}
-      role="application"
-      aria-label="Map of branch locations, with marker sizes based on net sales"
-    />
+    <>
+      {!locations.length && (
+        <div className="location-map-notice" role="status">
+          <strong>No shop coordinates yet.</strong>
+          <span>Use “Branch location” in the manager sidebar to add latitude and longitude. The map is centered on Kenya until shops are mapped.</span>
+        </div>
+      )}
+      <div
+        className="location-map"
+        ref={mapElement}
+        role="application"
+        aria-label="Map of shop locations, with marker sizes based on net sales"
+      />
+    </>
   );
 }
 
@@ -117,6 +123,7 @@ function LocationIntelligence() {
   const [startDate, setStartDate] = useState(() => moveDate(today, -29));
   const [endDate, setEndDate] = useState(today);
   const [report, setReport] = useState(null);
+  const [branchLocations, setBranchLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [appliedRange, setAppliedRange] = useState({ start: startDate, end: endDate });
@@ -140,6 +147,44 @@ function LocationIntelligence() {
     return () => { active = false; };
   }, [appliedRange]);
 
+  useEffect(() => {
+    let active = true;
+    const updateBranchLocation = (event) => {
+      const updatedBranch = event.detail;
+      if (!updatedBranch) return;
+
+      setBranchLocations((current) => current.map((branch) => (
+        String(branch.id) === String(updatedBranch.id)
+          ? { ...branch, ...updatedBranch }
+          : branch
+      )));
+      setReport((current) => current && ({
+        ...current,
+        branches: current.branches.map((branch) => (
+          String(branch.branch_id) === String(updatedBranch.id)
+            ? {
+              ...branch,
+              location: updatedBranch.location,
+              latitude: updatedBranch.latitude,
+              longitude: updatedBranch.longitude,
+            }
+            : branch
+        )),
+      }));
+    };
+
+    window.addEventListener("techpoint:branch-location-updated", updateBranchLocation);
+    apiFetch("/auth/branches")
+      .then((data) => {
+        if (active) setBranchLocations(data.branches || []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      window.removeEventListener("techpoint:branch-location-updated", updateBranchLocation);
+    };
+  }, []);
+
   const applyDates = (event) => {
     event.preventDefault();
     setLoading(true);
@@ -148,6 +193,7 @@ function LocationIntelligence() {
   };
 
   const summary = report?.summary;
+  const mapBranches = report ? report.branches : branchLocations;
 
   return (
     <main className="location-page">
@@ -173,6 +219,16 @@ function LocationIntelligence() {
       {error && <div className="location-error" role="alert">{error}</div>}
       {loading && !report && <div className="location-loading">Loading location report…</div>}
 
+      <section className="location-panel">
+        <div className="location-panel-heading">
+          <div>
+            <h3>Shop distribution map</h3>
+            <p>Each marker shows a shop. Blue marks active shops, gray marks inactive shops, and larger markers indicate higher net sales. Select a marker for shop details.</p>
+          </div>
+        </div>
+        <BranchMap branches={mapBranches} />
+      </section>
+
       {report && (
         <>
           <section className="location-summary-grid" aria-label="Business totals for the selected period">
@@ -196,16 +252,6 @@ function LocationIntelligence() {
               <span>Branches mapped</span>
               <strong>{report.branch_count_with_coordinates} / {report.branch_count}</strong>
             </article>
-          </section>
-
-          <section className="location-panel">
-            <div className="location-panel-heading">
-              <div>
-                <h3>Shop distribution map</h3>
-                <p>Each marker shows a shop. Blue marks active shops, gray marks inactive shops, and larger markers indicate higher net sales. Select a marker for shop details.</p>
-              </div>
-            </div>
-            <BranchMap branches={report.branches} />
           </section>
 
           <section className="location-panel">

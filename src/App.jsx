@@ -1001,7 +1001,7 @@ function App() {
     "manager"
   ) {
     return (
-      <>
+      <div className="manager-layout">
         <ManagerNav
           user={currentUser}
           onLogout={
@@ -1009,7 +1009,8 @@ function App() {
           }
         />
 
-        <Routes>
+        <div className="manager-main">
+          <Routes>
           <Route
             path="/manager"
             element={
@@ -1077,8 +1078,9 @@ function App() {
               />
             }
           />
-        </Routes>
-      </>
+          </Routes>
+        </div>
+      </div>
     );
   }
 
