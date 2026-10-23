@@ -218,14 +218,18 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 25px;
-  padding: 18px 35px;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+  width: 100%;
+  padding: 18px 28px;
+  box-sizing: border-box;
   background: #1f2937;
   color: white;
 }
 
 .manager-brand {
-  min-width: 170px;
+  flex: 0 1 190px;
+  min-width: 0;
 }
 
 .manager-brand h1 {
@@ -239,18 +243,22 @@ p {
 
 .manager-nav {
   display: flex;
+  flex: 1 1 100%;
+  order: 3;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  justify-content: flex-start;
 }
 
 .manager-nav a {
   color: #d1d5db;
   text-decoration: none;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 6px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .manager-nav a:hover {
@@ -265,9 +273,13 @@ p {
 
 .manager-user {
   display: flex;
+  flex: 1 1 650px;
+  order: 2;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  white-space: nowrap;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .manager-branch-picker,
@@ -370,6 +382,7 @@ p {
 }
 
 .manager-user button {
+  margin-left: 0;
   padding: 9px 15px;
   border: none;
   border-radius: 6px;
@@ -384,7 +397,10 @@ p {
   .manager-nav {
     order: 3;
     width: 100%;
-    overflow-x: auto;
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow: visible;
     justify-content: flex-start;
   }
 }
@@ -399,14 +415,19 @@ p {
   }
 
   .manager-nav a {
-    white-space: nowrap;
     font-size: 14px;
+    padding: 8px 10px;
   }
 
   .manager-user {
     width: 100%;
-    justify-content: space-between;
+    flex: 1 1 100%;
+    justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .manager-branch-form {
+    right: 0;
   }
 }
 /* ================================

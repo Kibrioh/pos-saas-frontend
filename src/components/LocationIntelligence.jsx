@@ -201,8 +201,8 @@ function LocationIntelligence() {
           <section className="location-panel">
             <div className="location-panel-heading">
               <div>
-                <h3>Branch map</h3>
-                <p>Marker size reflects net sales in the selected period. Select a marker for branch details.</p>
+                <h3>Shop distribution map</h3>
+                <p>Each marker shows a shop. Blue marks active shops, gray marks inactive shops, and larger markers indicate higher net sales. Select a marker for shop details.</p>
               </div>
             </div>
             <BranchMap branches={report.branches} />

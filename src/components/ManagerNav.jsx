@@ -150,7 +150,7 @@ function ManagerNav({ user, onLogout }) {
   </NavLink>
 
   <NavLink to="/manager/locations">
-    Locations
+    Shops & map
   </NavLink>
 
   <NavLink to="/manager/audit">
