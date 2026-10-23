@@ -56,6 +56,7 @@ import { useDebounce } from "./hooks/useDebounce";
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const initialPathname = useRef(location.pathname);
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -79,7 +80,13 @@ function App() {
       .then(({ user }) => {
         if (!isMounted) return;
         setCurrentUser(user);
-        navigate(user.role === "manager" ? "/manager" : "/");
+        const requestedPath = initialPathname.current;
+        const isManagerPath = requestedPath === "/manager" || requestedPath.startsWith("/manager/");
+        if (user.role === "manager" && !isManagerPath) {
+          navigate("/manager", { replace: true });
+        } else if (user.role !== "manager" && isManagerPath) {
+          navigate("/", { replace: true });
+        }
       })
       .catch(() => {
         clearToken();
