@@ -55,6 +55,7 @@ selected branch to requests and turns server errors into readable messages.
 | Manager: sales | `GET /api/sales` (all cashiers' sales) and `GET /api/reports/sales-by-cashier` |
 | Manager: cashiers | `GET /api/auth/users` to list, `POST /api/auth/register` to add |
 | Manager: dashboard | Sales, transaction, inventory, low-stock, and cashier totals from `GET /api/reports/dashboard` |
+| Manager: locations | Cross-branch sales, margin, returns, current stock, and stockout comparison from `GET /api/reports/location-performance`; branches with coordinates appear on an interactive map |
 | Manager: products | Loads products and categories from the database; add and edit through `POST` / `PUT /api/products`; stock +/- through `POST /api/stock/adjust` (recorded as stock movements) |
 
 The backend stores prices in USD. The frontend converts them to KSh for display
@@ -132,6 +133,22 @@ The frontend calls `http://127.0.0.1:5000/api` by default. To use another
 address, create a file named `.env` in this project's root:
 
     VITE_API_URL=http://127.0.0.1:5000/api
+
+### Optional: change the map tile service
+
+The location report uses OpenStreetMap tiles by default and includes map
+attribution. Set `VITE_MAP_TILE_URL` and `VITE_MAP_ATTRIBUTION` in `.env` if
+you use a hosted map provider, for example:
+
+    VITE_MAP_TILE_URL=https://tiles.example.com/{z}/{x}/{y}.png?key=YOUR_KEY
+    VITE_MAP_ATTRIBUTION=Map data © Example Provider
+
+Use a browser-safe key restricted to this domain if the provider supports it.
+OpenStreetMap's public tile service is best-effort and has no service-level
+agreement; use a hosted provider for production SaaS traffic. See the
+[OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
+Branch coordinates can be entered in the manager header under **Branch location**.
+Automatic address geocoding is not configured yet.
 
 ### Logging in
 

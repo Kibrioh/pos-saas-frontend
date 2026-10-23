@@ -19,11 +19,15 @@ import {
 } from "react-router-dom";
 
 import {
+  Suspense,
+  lazy,
   useEffect,
   useMemo,
   useState,
   useRef,
 } from "react";
+
+const LocationIntelligence = lazy(() => import("./components/LocationIntelligence"));
 
 import { getProducts } from "./api/products";
 import { getCategories } from "./api/categories";
@@ -1035,6 +1039,14 @@ function App() {
             />
             <Route path="/manager/shifts" element={<ManagerShifts />} />
             <Route path="/manager/audit" element={<ManagerAudit />} />
+            <Route
+              path="/manager/locations"
+              element={(
+                <Suspense fallback={<div className="location-loading">Loading location report…</div>}>
+                  <LocationIntelligence />
+                </Suspense>
+              )}
+            />
 
           <Route
             path="/manager/products"
