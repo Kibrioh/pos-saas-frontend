@@ -1,6 +1,7 @@
 import Login from "./components/Login";
 import ManagerDashboard from "./components/ManagerDashboard";
 import ManagerNav from "./components/ManagerNav";
+import ManagerProfile from "./components/ManagerProfile";
 import ManagerSales from "./components/ManagerSales";
 import ManagerProducts from "./components/ManagerProducts";
 import ManagerCashiers from "./components/ManagerCashiers";
@@ -1024,6 +1025,19 @@ function App() {
               <ManagerDashboard
               />
             }
+          />
+
+          <Route
+            path="/manager/profile"
+            element={(
+              <ManagerProfile
+                user={currentUser}
+                onProfileUpdated={(updatedUser) => setCurrentUser((user) => ({
+                  ...user,
+                  ...updatedUser,
+                }))}
+              />
+            )}
           />
 
           <Route

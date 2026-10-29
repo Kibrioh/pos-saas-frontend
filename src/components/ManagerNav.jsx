@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { apiFetch, setActiveBranchId } from "../api/client";
 import GoogleLocationInput from "./GoogleLocationInput";
+import BranchCoordinatesPicker from "./BranchCoordinatesPicker";
 import { clearPendingManagerSuccess, getPendingManagerSuccess, MANAGER_SUCCESS_EVENT, showManagerSuccess } from "../utils/managerToast";
 
 function BranchLocationEditor({ branch, onSaved }) {
   const [location, setLocation] = useState(branch.location || "");
   const [googlePlaceId, setGooglePlaceId] = useState(branch.google_place_id || "");
+  const [latitude, setLatitude] = useState(branch.latitude == null ? "" : String(branch.latitude));
+  const [longitude, setLongitude] = useState(branch.longitude == null ? "" : String(branch.longitude));
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -20,8 +23,8 @@ function BranchLocationEditor({ branch, onSaved }) {
         body: JSON.stringify({
           location: location.trim() || null,
           google_place_id: googlePlaceId || null,
-          latitude: googlePlaceId || location.trim() !== (branch.location || "") ? null : branch.latitude,
-          longitude: googlePlaceId || location.trim() !== (branch.location || "") ? null : branch.longitude,
+          latitude: googlePlaceId || latitude === "" ? null : latitude,
+          longitude: googlePlaceId || longitude === "" ? null : longitude,
         }),
       });
       onSaved(result.branch);
@@ -48,10 +51,21 @@ function BranchLocationEditor({ branch, onSaved }) {
         onPlaceSelected={(place) => {
           setLocation(place.location);
           setGooglePlaceId(place.googlePlaceId);
+          setLatitude("");
+          setLongitude("");
           setSaved(false);
         }}
       />
-      <small className="manager-branch-help">Choose a Google Maps suggestion to link this branch to a mappable location.</small>
+      <BranchCoordinatesPicker
+        latitude={latitude}
+        longitude={longitude}
+        onChange={(nextLatitude, nextLongitude) => {
+          setLatitude(nextLatitude);
+          setLongitude(nextLongitude);
+          setGooglePlaceId("");
+          setSaved(false);
+        }}
+      />
       <button type="submit">Save</button>
       {saved && <span className="manager-branch-saved" role="status">Saved</span>}
       {error && <span className="manager-branch-error" role="alert">{error}</span>}
@@ -64,24 +78,29 @@ function ManagerNav({ user, onLogout }) {
   const [newBranchName, setNewBranchName] = useState("");
   const [newBranchLocation, setNewBranchLocation] = useState("");
   const [newBranchGooglePlaceId, setNewBranchGooglePlaceId] = useState("");
+  const [newBranchLatitude, setNewBranchLatitude] = useState("");
+  const [newBranchLongitude, setNewBranchLongitude] = useState("");
   const [branchError, setBranchError] = useState("");
   const [branchLocationExpanded, setBranchLocationExpanded] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(getPendingManagerSuccess);
+  const [successToast, setSuccessToast] = useState(getPendingManagerSuccess);
   const activeBranchId = user.active_branch_id || user.branch_id;
   const selectedBranch = branches.find((branch) => String(branch.id) === String(activeBranchId));
 
   useEffect(() => {
     clearPendingManagerSuccess();
-    const handleSuccess = (event) => setSuccessMessage(event.detail?.message || "Action completed.");
+    const handleSuccess = (event) => setSuccessToast({
+      message: event.detail?.message || "Action completed.",
+      position: event.detail?.position || null,
+    });
     window.addEventListener(MANAGER_SUCCESS_EVENT, handleSuccess);
     return () => window.removeEventListener(MANAGER_SUCCESS_EVENT, handleSuccess);
   }, []);
 
   useEffect(() => {
-    if (!successMessage) return undefined;
-    const timeout = window.setTimeout(() => setSuccessMessage(""), 3600);
+    if (!successToast) return undefined;
+    const timeout = window.setTimeout(() => setSuccessToast(null), 3600);
     return () => window.clearTimeout(timeout);
-  }, [successMessage]);
+  }, [successToast]);
 
   useEffect(() => {
     let active = true;
@@ -111,8 +130,8 @@ function ManagerNav({ user, onLogout }) {
           name,
           location: newBranchLocation.trim() || null,
           google_place_id: newBranchGooglePlaceId || null,
-          latitude: null,
-          longitude: null,
+          latitude: newBranchGooglePlaceId || newBranchLatitude === "" ? null : newBranchLatitude,
+          longitude: newBranchGooglePlaceId || newBranchLongitude === "" ? null : newBranchLongitude,
         }),
       });
       switchBranch(result.branch.id, `Branch “${result.branch.name || name}” created and selected.`);
@@ -142,7 +161,10 @@ function ManagerNav({ user, onLogout }) {
       </aside>
 
       <header className="manager-topbar" aria-label="Manager account and branch controls">
-        <span className="manager-topbar-welcome">Welcome, {user.username}</span>
+        <div className="manager-topbar-intro">
+          <span className="manager-topbar-eyebrow">Manager workspace</span>
+          <span className="manager-topbar-welcome">Welcome back, {user.name || user.username}</span>
+        </div>
         <div className="manager-topbar-controls">
           <label className="manager-branch-picker">
             <span>Branch</span>
@@ -181,9 +203,19 @@ function ManagerNav({ user, onLogout }) {
                 onPlaceSelected={(place) => {
                   setNewBranchLocation(place.location);
                   setNewBranchGooglePlaceId(place.googlePlaceId);
+                  setNewBranchLatitude("");
+                  setNewBranchLongitude("");
                 }}
               />
-              <small className="manager-branch-help">Choose a Google Maps suggestion to link this branch to a mappable location.</small>
+              <BranchCoordinatesPicker
+                latitude={newBranchLatitude}
+                longitude={newBranchLongitude}
+                onChange={(latitude, longitude) => {
+                  setNewBranchLatitude(latitude);
+                  setNewBranchLongitude(longitude);
+                  setNewBranchGooglePlaceId("");
+                }}
+              />
               <button type="submit">Create</button>
               {branchError && <span className="manager-branch-error" role="alert">{branchError}</span>}
             </form>
@@ -207,9 +239,31 @@ function ManagerNav({ user, onLogout }) {
             ) : null}
           </details>
 
+          <NavLink className="manager-profile-link" to="/manager/profile" aria-label="Open manager profile">
+            <span className="manager-profile-link-avatar" aria-hidden="true">
+              {(user.name || user.username || "M").trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}
+            </span>
+            <span className="manager-profile-link-copy">
+              <strong>My profile</strong>
+              <small>Account settings</small>
+            </span>
+          </NavLink>
+
           <button className="manager-logout" onClick={onLogout}>Logout</button>
         </div>
-        {successMessage && <div className="manager-success-toast" role="status">{successMessage}</div>}
+        {successToast && (
+          <div
+            className="manager-success-toast"
+            role="status"
+            style={successToast.position ? {
+              left: `${successToast.position.left}px`,
+              top: `${successToast.position.top}px`,
+              right: "auto",
+            } : undefined}
+          >
+            {successToast.message}
+          </div>
+        )}
       </header>
     </>
   );
