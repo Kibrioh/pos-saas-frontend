@@ -3,6 +3,7 @@ import { apiFetch } from "../api/client";
 import { getProducts } from "../api/products";
 import { formatKsh, toKsh, USD_TO_KSH } from "../utils/formatPrice";
 import "../styles/manager-actions.css";
+import { showManagerSuccess } from "../utils/managerToast";
 
 function ManagerPurchasing({ products = [], setProducts }) {
   const [suppliers, setSuppliers] = useState([]);
@@ -37,6 +38,7 @@ function ManagerPurchasing({ products = [], setProducts }) {
       await apiFetch("/suppliers", { method: "POST", body: JSON.stringify(supplierForm) });
       setSupplierForm({ name: "", phone: "", email: "" });
       await reload();
+      showManagerSuccess("Supplier saved successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,6 +66,7 @@ function ManagerPurchasing({ products = [], setProducts }) {
       setOrderForm((current) => ({ ...current, note: "" }));
       setOrderItems([{ product_id: "", quantity: "", unit_cost: "" }]);
       await reload();
+      showManagerSuccess("Purchase order created successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,6 +94,7 @@ function ManagerPurchasing({ products = [], setProducts }) {
       });
       setReceiveQuantities({});
       await reload();
+      showManagerSuccess(`Delivery recorded for PO-${order.id}.`);
     } catch (err) {
       setError(err.message);
     } finally {

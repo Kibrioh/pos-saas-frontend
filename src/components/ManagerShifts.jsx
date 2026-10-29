@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
 import { formatKsh, toKsh, USD_TO_KSH } from "../utils/formatPrice";
+import { showManagerSuccess } from "../utils/managerToast";
 
 function cashDifferenceLabel(value) {
   const difference = Number(value || 0);
@@ -92,6 +93,7 @@ function ManagerShifts() {
       setCashierId("");
       setOpeningFloat("");
       await reload();
+      showManagerSuccess("Cashier float assigned successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -117,6 +119,7 @@ function ManagerShifts() {
       setMovementNote("");
       await reload();
       setMovementSuccess("Till adjustment recorded. Updated expected till cash is shown below; the cashier can see it after refreshing their till panel.");
+      showManagerSuccess("Till adjustment recorded successfully.");
     } catch (err) {
       setMovementError(err.message);
       await reload();
@@ -137,6 +140,7 @@ function ManagerShifts() {
       setClosingShiftId(null);
       setClosingCash("");
       await reload();
+      showManagerSuccess(`Shift #${shift.id} closed successfully.`);
     } catch (requestError) {
       setClosingError(requestError.message || "Could not close this shift.");
     } finally {

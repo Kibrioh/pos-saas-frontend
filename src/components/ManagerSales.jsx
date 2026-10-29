@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
 import { formatKsh } from "../utils/formatPrice";
+import { showManagerSuccess } from "../utils/managerToast";
 import "../styles/manager-actions.css";
 
 function returnedQuantity(sale, saleItemId) {
@@ -22,6 +23,10 @@ function ManagerSales({ sales = [], onReturnCreated }) {
   const [openShifts, setOpenShifts] = useState([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [summaryCashier, setSummaryCashier] = useState("all");
+  const [saleIdFilter, setSaleIdFilter] = useState("all");
+  const [saleCashierFilter, setSaleCashierFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
 
   useEffect(() => {
     apiFetch("/shifts?status=open")
@@ -41,7 +46,18 @@ function ManagerSales({ sales = [], onReturnCreated }) {
     return sum + Number(sale.total || 0) - refunded;
   }, 0), [sales]);
 
-  const cashierNames = [...new Set(sales.map((sale) => sale.cashier))];
+  const cashierNames = [...new Set(sales.map((sale) => sale.cashier).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+  const productOptions = [...new Map(sales.flatMap((sale) => (sale.items || [])
+    .filter((item) => item.id != null)
+    .map((item) => [String(item.id), { id: item.id, title: item.title || `Product #${item.id}` }]))).values()]
+    .sort((left, right) => left.title.localeCompare(right.title, undefined, { sensitivity: "base" }));
+  const orderedSales = sales.slice().sort((left, right) => Number(right.id) - Number(left.id));
+  const filteredSales = orderedSales.filter((sale) => (
+    (saleIdFilter === "all" || String(sale.id) === saleIdFilter)
+    && (saleCashierFilter === "all" || sale.cashier === saleCashierFilter)
+    && (productFilter === "all" || (sale.items || []).some((item) => String(item.id) === productFilter))
+  ));
 
   const beginReturn = (sale) => {
     setReturnSaleId(sale.id);
@@ -85,6 +101,7 @@ function ManagerSales({ sales = [], onReturnCreated }) {
       });
       setReturnSaleId(null);
       onReturnCreated?.();
+      showManagerSuccess(`Return recorded for Sale #${sale.id}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -104,26 +121,42 @@ function ManagerSales({ sales = [], onReturnCreated }) {
       </div>
 
       <section className="manager-section">
-        <h3>Cashier Sales Summary</h3>
+        <div className="section-heading-row manager-filter-heading">
+          <div><h3>Cashier Sales Summary</h3><p>Cashier names are shown in ascending order.</p></div>
+          <label className="manager-filter-control">
+            <span>Cashier</span>
+            <select value={summaryCashier} onChange={(event) => setSummaryCashier(event.target.value)}>
+              <option value="all">All cashiers</option>
+              {cashierNames.map((cashier) => <option key={cashier} value={cashier}>{cashier}</option>)}
+            </select>
+          </label>
+        </div>
         {cashierNames.length === 0 ? <p>No cashier sales yet.</p> : (
           <div className="cashier-sales-summary">
-            {cashierNames.map((cashier) => {
+            {cashierNames.filter((cashier) => summaryCashier === "all" || cashier === summaryCashier).map((cashier) => {
               const cashierSales = sales.filter((sale) => sale.cashier === cashier);
               const cashierNet = cashierSales.reduce((total, sale) => {
                 const refunds = (sale.returns || []).reduce((sum, record) => sum + Number(record.refund_total || 0), 0);
                 return total + Number(sale.total || 0) - refunds;
               }, 0);
-              return <div className="manager-card" key={cashier}><h3>{cashier}</h3><p>Transactions: <strong>{cashierSales.length}</strong></p><p>Net revenue: <strong>{formatKsh(cashierNet)}</strong></p></div>;
+              return <article className="manager-card cashier-summary-card" key={cashier}><h3>{cashier}</h3><p>Transactions <strong>{cashierSales.length}</strong></p><p>Net revenue <strong>{formatKsh(cashierNet)}</strong></p></article>;
             })}
           </div>
         )}
       </section>
 
       <section className="manager-section">
-        <div className="section-heading-row"><div><h3>Completed Sales</h3><p>Returns are linked to the original sale and cannot exceed the purchased quantity.</p></div></div>
+        <div className="section-heading-row manager-filter-heading">
+          <div><h3>Completed Sales</h3><p>Returns are linked to the original sale and cannot exceed the purchased quantity.</p></div>
+          <div className="manager-filter-toolbar" role="group" aria-label="Filter completed sales">
+            <label className="manager-filter-control"><span>Sale ID</span><select value={saleIdFilter} onChange={(event) => setSaleIdFilter(event.target.value)}><option value="all">All sales</option>{orderedSales.map((sale) => <option key={sale.id} value={sale.id}>Sale #{sale.id}</option>)}</select></label>
+            <label className="manager-filter-control"><span>Cashier</span><select value={saleCashierFilter} onChange={(event) => setSaleCashierFilter(event.target.value)}><option value="all">All cashiers</option>{cashierNames.map((cashier) => <option key={cashier} value={cashier}>{cashier}</option>)}</select></label>
+            <label className="manager-filter-control"><span>Product</span><select value={productFilter} onChange={(event) => setProductFilter(event.target.value)}><option value="all">All products</option>{productOptions.map((product) => <option key={product.id} value={product.id}>{product.title} · #{product.id}</option>)}</select></label>
+          </div>
+        </div>
         {sales.length === 0 ? <p>No sales have been recorded yet.</p> : (
-          <div className="manager-sales-list">
-            {sales.slice().reverse().map((sale) => {
+          filteredSales.length ? <div className="manager-sales-list">
+            {filteredSales.map((sale) => {
               const refunded = (sale.returns || []).reduce((sum, record) => sum + Number(record.refund_total || 0), 0);
               const hasReturnableItems = sale.items.some((item) => returnedQuantity(sale, item.saleItemId) < item.quantity);
               return (
@@ -132,7 +165,10 @@ function ManagerSales({ sales = [], onReturnCreated }) {
                     <div><h4>Sale #{sale.id}</h4><p>{sale.cashier} · {new Date(sale.completedAt).toLocaleString()}</p><p>{sale.itemCount} items · {sale.paymentMethod || "Payment method unavailable"}</p></div>
                     <div className="manager-sale-total"><strong>{formatKsh(sale.total)}</strong>{refunded > 0 && <span>{formatKsh(refunded)} refunded</span>}</div>
                   </div>
-                  <ul className="manager-sale-items">{sale.items.map((item) => <li key={item.saleItemId}><span>{item.title} × {item.quantity}</span><strong>{formatKsh(item.price * item.quantity)}</strong></li>)}</ul>
+                  <details className="manager-sale-items-disclosure">
+                    <summary>View {sale.itemCount} purchased item{sale.itemCount === 1 ? "" : "s"}</summary>
+                    <ul className="manager-sale-items">{sale.items.map((item) => <li key={item.saleItemId}><span>{item.title} × {item.quantity}</span><strong>{formatKsh(item.price * item.quantity)}</strong></li>)}</ul>
+                  </details>
 
                   {(sale.returns || []).length > 0 && <details className="sale-return-history"><summary>{sale.returns.length} return{sale.returns.length === 1 ? "" : "s"} recorded</summary>{sale.returns.map((record) => <p key={record.id}>{formatKsh(Number(record.refund_total))} via {record.refund_method} · {record.reason} · {new Date(record.created_at).toLocaleString()}</p>)}</details>}
 
@@ -160,7 +196,7 @@ function ManagerSales({ sales = [], onReturnCreated }) {
                 </article>
               );
             })}
-          </div>
+          </div> : <p className="manager-filter-empty">No sales match those filters.</p>
         )}
       </section>
     </main>

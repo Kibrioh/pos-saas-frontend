@@ -350,7 +350,7 @@ function App() {
   const [category, setCategory] =
     useState("all");
   const [productPage, setProductPage] = useState(1);
-  const [productPageSize, setProductPageSize] = useState(10);
+  const [productPageSize, setProductPageSize] = useState(12);
 
    const filteredProducts = useMemo(() => {
     const matches = filterProducts(products, search, category);
@@ -2410,6 +2410,7 @@ function App() {
                     currentPage={currentProductPage}
                     pageSize={productPageSize}
                     totalItems={filteredProducts.length}
+                    pageSizeOptions={[12, 20, 50]}
                     onPageChange={setProductPage}
                     onPageSizeChange={(size) => {
                       setProductPageSize(size);

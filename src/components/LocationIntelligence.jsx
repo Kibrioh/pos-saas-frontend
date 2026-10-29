@@ -260,7 +260,7 @@ function BranchMap({ branches, hasLoaded }) {
       {!locations.length && !unresolvedGooglePlaces && placeResolutionStatus === "idle" && (
         <div className="location-map-notice" role="status">
           <strong>No shop coordinates yet.</strong>
-          <span>Use “Branch location” in the manager sidebar to add latitude and longitude. The map is centered on Kenya until shops are mapped.</span>
+          <span>Use “Branch location” in the manager top bar to add a shop location. The map is centered on Kenya until shops are mapped.</span>
         </div>
       )}
       <div

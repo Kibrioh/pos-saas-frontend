@@ -5,6 +5,7 @@ function ProductPagination({
   pageSize,
   totalItems,
   itemLabel = "products",
+  pageSizeOptions = [10, 20, 50],
   onPageChange,
   onPageSizeChange,
 }) {
@@ -33,9 +34,7 @@ function ProductPagination({
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
             aria-label={`${itemLabel} per page`}
           >
-            <option value="10">10</option>
-            <option value="20">20</option>
-            <option value="50">50</option>
+            {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
           <span>per page</span>
         </label>

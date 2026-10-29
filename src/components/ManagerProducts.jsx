@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatPrice, toKsh, USD_TO_KSH } from "../utils/formatPrice";
 import ProductPagination from "./ProductPagination";
 import "../styles/manager-actions.css";
+import { showManagerSuccess } from "../utils/managerToast";
 
 function ManagerProducts({
   products = [],
@@ -18,7 +19,7 @@ function ManagerProducts({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(12);
 
   const [editingId, setEditingId] = useState(null);
   const [newPrice, setNewPrice] = useState("");
@@ -106,6 +107,7 @@ function ManagerProducts({
       });
 
       await reloadProducts();
+      showManagerSuccess(`Stock updated for ${product.title}.`);
     } catch (err) {
       window.alert(err.message);
     }
@@ -133,6 +135,7 @@ function ManagerProducts({
     try {
       await deleteProductRequest(product.id);
       await reloadProducts();
+      showManagerSuccess(`${product.title} removed from the active catalogue.`);
     } catch (err) {
       window.alert(err.message);
     }
@@ -188,6 +191,7 @@ function ManagerProducts({
       await reloadProducts();
       setEditingDetailsId(null);
       setProductDetailsForm(null);
+      showManagerSuccess(`${product.title} details saved.`);
     } catch (err) {
       setDetailsError(err.message);
     } finally {
@@ -211,6 +215,8 @@ function ManagerProducts({
       await reloadProducts();
       setEditingId(null);
       setNewPrice("");
+      const product = products.find((item) => item.id === id);
+      showManagerSuccess(`Price updated${product ? ` for ${product.title}` : ""}.`);
     } catch (err) {
       window.alert(err.message);
     }
@@ -231,6 +237,7 @@ function ManagerProducts({
 
   const addProduct = async (e) => {
     e.preventDefault();
+    const createdTitle = newProduct.title.trim();
 
     if (
       !newProduct.title.trim() ||
@@ -271,6 +278,7 @@ function ManagerProducts({
         stock: "",
       });
       setThumbnailPreviewError(false);
+      showManagerSuccess(`${createdTitle} added to inventory.`);
     } catch (err) {
       window.alert(err.message);
     }
@@ -640,6 +648,7 @@ function ManagerProducts({
             currentPage={visiblePage}
             pageSize={pageSize}
             totalItems={filteredProducts.length}
+            pageSizeOptions={[12, 20, 50]}
             onPageChange={setCurrentPage}
             onPageSizeChange={(size) => {
               setPageSize(size);

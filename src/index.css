@@ -35,6 +35,7 @@ body {
 
 #root {
   min-height: 100vh;
+  zoom: 0.93;
 }
 
 h1,
@@ -178,12 +179,16 @@ p {
   border-radius: 5px;
 }
 .manager-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
   background: #f5f6f8;
 }
 
 .manager-sidebar {
+  grid-column: 1;
+  grid-row: 1 / span 2;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -244,36 +249,56 @@ p {
   color: #1f2937;
 }
 
-.manager-user {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+.manager-topbar {
+  grid-column: 2;
+  grid-row: 1;
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   min-width: 0;
-  margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px solid #475569;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e7e1;
+  background: #fff;
+}
+
+.manager-topbar-welcome {
+  min-width: 0;
+  color: #475569;
+  font-weight: 600;
+}
+
+.manager-topbar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
 }
 
 .manager-branch-picker,
 .manager-branch-tools {
   display: block;
   min-width: 0;
-  color: #d1d5db;
+  color: #334155;
 }
 
 .manager-branch-picker span {
   display: block;
-  margin-bottom: 5px;
-  font-size: 13px;
+  margin-bottom: 2px;
+  font-size: 11px;
 }
 
 .manager-branch-picker select {
-  width: 100%;
-  min-width: 0;
-  max-width: none;
+  width: 150px;
+  min-width: 110px;
+  max-width: 220px;
   box-sizing: border-box;
-  padding: 7px 8px;
-  border: 1px solid #64748b;
+  padding: 7px 9px;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #fff;
   color: #1f2937;
@@ -286,10 +311,11 @@ p {
 
 .manager-branch-tools summary {
   padding: 8px 10px;
-  border: 1px solid #64748b;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
   cursor: pointer;
   list-style: none;
+  white-space: nowrap;
 }
 
 .manager-branch-tools summary::-webkit-details-marker {
@@ -307,26 +333,14 @@ p {
   right: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  width: 330px;
+  width: min(330px, calc(100vw - 32px));
   padding: 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: white;
   box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
-}
-
-.manager-sidebar .manager-branch-form {
-  position: static;
-  grid-template-columns: minmax(0, 1fr);
-  width: 100%;
-  margin-top: 8px;
-  box-shadow: none;
-}
-
-.manager-sidebar .manager-branch-form input:first-child {
-  grid-column: auto;
 }
 
 .manager-branch-form input {
@@ -426,7 +440,7 @@ p {
   text-align: right;
 }
 
-.manager-coordinate-help {
+.manager-branch-help {
   grid-column: 1 / -1;
   color: #475569;
   font-size: 12px;
@@ -447,16 +461,20 @@ p {
   color: #15803d;
 }
 
-.manager-user button {
-  margin-left: 0;
-  width: 100%;
+.manager-logout {
   padding: 9px 15px;
-  border: none;
+  border: 1px solid #d45c3c;
   border-radius: 6px;
+  background: #d45c3c;
+  color: white;
+  font: inherit;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .manager-main {
+  grid-column: 2;
+  grid-row: 2;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -477,18 +495,19 @@ p {
     padding: 18px 22px;
   }
 
+  .manager-topbar {
+    position: relative;
+    top: auto;
+    flex-wrap: wrap;
+    padding: 12px 22px;
+  }
+
   .manager-nav {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   }
 
-  .manager-user {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    margin-top: 0;
-    padding-top: 14px;
-  }
-
-  .manager-user > span {
-    align-self: center;
+  .manager-topbar-controls {
+    flex-wrap: wrap;
   }
 
   .manager-main {
@@ -510,8 +529,26 @@ p {
     padding: 8px;
   }
 
-  .manager-user {
-    grid-template-columns: minmax(0, 1fr);
+  .manager-topbar {
+    align-items: flex-start;
+    padding: 12px 16px;
+  }
+
+  .manager-topbar-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .manager-branch-picker {
+    flex: 1 1 130px;
+  }
+
+  .manager-branch-picker select {
+    width: 100%;
+  }
+
+  .manager-branch-tools {
+    flex: 0 0 auto;
   }
 }
 /* ================================

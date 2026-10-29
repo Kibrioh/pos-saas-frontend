@@ -171,20 +171,22 @@ function paymentMethodLabel(method) {
 function PaymentMethodChart({ rows }) {
   const totalRevenue = rows.reduce((sum, row) => sum + Math.max(toKsh(row.net_sales), 0), 0);
   const totalTransactions = rows.reduce((sum, row) => sum + Number(row.transactions || 0), 0);
-  let accumulated = 0;
-  const slices = rows.map((row) => {
+  const slices = rows.reduce((result, row) => {
     const value = Math.max(toKsh(row.net_sales), 0);
-    const start = totalRevenue ? (accumulated / totalRevenue) * 100 : 0;
-    accumulated += value;
+    const start = totalRevenue ? (result.accumulated / totalRevenue) * 100 : 0;
+    const accumulated = result.accumulated + value;
     const end = totalRevenue ? (accumulated / totalRevenue) * 100 : 0;
     return {
-      ...row,
-      color: PAYMENT_COLORS[row.payment_method] || "#8295b4",
-      start,
-      end,
-      share: totalRevenue ? (value / totalRevenue) * 100 : 0,
+      accumulated,
+      slices: [...result.slices, {
+        ...row,
+        color: PAYMENT_COLORS[row.payment_method] || "#8295b4",
+        start,
+        end,
+        share: totalRevenue ? (value / totalRevenue) * 100 : 0,
+      }],
     };
-  });
+  }, { accumulated: 0, slices: [] }).slices;
   const gradient = totalRevenue
     ? `conic-gradient(${slices.map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`).join(", ")})`
     : "conic-gradient(#e7ebf2 0% 100%)";
@@ -246,6 +248,32 @@ function ActivityBars({ rows, label, isHour = false }) {
       })}
       <span className="performance-activity-caption">{label}</span>
     </div>
+  );
+}
+
+function RankingBars({ rows, getLabel, getValue, formatValue, getDetail, color = "blue" }) {
+  if (!rows.length) return <p className="performance-empty performance-empty--compact">No data to chart.</p>;
+  const orderedRows = rows.slice().sort((left, right) => Number(getValue(right) || 0) - Number(getValue(left) || 0));
+  const maximum = Math.max(...orderedRows.map((row) => Math.max(Number(getValue(row) || 0), 0)), 1);
+
+  return (
+    <ol className={`performance-rankings performance-rankings--${color}`}>
+      {orderedRows.map((row, index) => {
+        const value = Math.max(Number(getValue(row) || 0), 0);
+        return (
+          <li key={row.product_id ?? row.category ?? row.user_id ?? getLabel(row)}>
+            <div className="performance-ranking-heading">
+              <strong title={getLabel(row)}>{index + 1}. {getLabel(row)}</strong>
+              <span>{formatValue(row, value)}</span>
+            </div>
+            <div className="performance-bar-track" aria-hidden="true">
+              <span style={{ width: `${value > 0 ? Math.max((value / maximum) * 100, 2) : 0}%` }} />
+            </div>
+            {getDetail && <small>{getDetail(row)}</small>}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -408,112 +436,6 @@ function ManagerDashboard() {
                   : <RevenueChart series={series} />}
             </section>
 
-            <section className="performance-panel performance-panel--payments">
-              <div className="performance-panel-heading">
-                <div><h2>Payment methods</h2><p>Net sales share and transaction count</p></div>
-              </div>
-              {loading ? <p className="performance-empty">Loading payment summary…</p>
-                : !data?.payment_methods?.length ? <p className="performance-empty">No payments in this period.</p>
-                  : <PaymentMethodChart rows={data.payment_methods} />}
-            </section>
-
-            <section className="performance-panel performance-panel--products">
-              <div className="performance-panel-heading">
-                <div><h2>Best-selling products</h2><p>Units kept after returns, with profit contribution</p></div>
-                <NavLink to="/manager/products">Inventory <span aria-hidden="true">→</span></NavLink>
-              </div>
-              {loading ? <p className="performance-empty">Loading product sales…</p>
-                : !bestSellers.length ? <p className="performance-empty">No product sales in this period.</p>
-                  : (
-                    <div className="performance-table-scroll">
-                      <table className="performance-table">
-                        <thead><tr><th>Product</th><th>Units</th><th>Net sales</th><th>Gross profit</th></tr></thead>
-                        <tbody>{bestSellers.slice(0, 8).map((product) => (
-                          <tr key={product.product_id}>
-                            <th scope="row" title={product.product_title}>{product.product_title}</th>
-                            <td>{Number(product.units_sold || 0).toLocaleString("en-KE")}</td>
-                            <td>{formatKsh(toKsh(product.net_revenue))}</td>
-                            <td>{Number(product.cost_coverage_rate || 0) <= 0 ? "—" : formatKsh(toKsh(product.gross_profit))}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  )}
-              {!loading && profitProducts.length > 0 && (
-                <>
-                  <h3 className="performance-chart-subtitle">Highest gross profit contribution</h3>
-                  <div className="performance-table-scroll">
-                    <table className="performance-table">
-                      <thead><tr><th>Product</th><th>Gross profit</th><th>Margin</th><th>Cost coverage</th></tr></thead>
-                      <tbody>{profitProducts.slice(0, 5).map((product) => (
-                        <tr key={product.product_id}>
-                          <th scope="row">{product.product_title}</th>
-                          <td>{product.cost_coverage_rate == null ? "—" : formatKsh(toKsh(product.gross_profit))}</td>
-                          <td>{product.margin_rate == null ? "—" : `${Number(product.margin_rate).toFixed(1)}%`}</td>
-                          <td>{product.cost_coverage_rate == null ? "—" : `${Number(product.cost_coverage_rate).toFixed(0)}%`}</td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-              {!loading && data?.current?.items_without_cost > 0 && (
-                <p className="performance-data-note">Profit omits {Number(data.current.items_without_cost).toLocaleString("en-KE")} sold units without a recorded cost.</p>
-              )}
-            </section>
-
-            <section className="performance-panel performance-panel--categories">
-              <div className="performance-panel-heading">
-                <div><h2>Profit by category</h2><p>Net revenue and margin from recorded item costs</p></div>
-              </div>
-              {loading ? <p className="performance-empty">Loading category margin…</p>
-                : !profitByCategory.length ? <p className="performance-empty">No category sales in this period.</p>
-                  : (
-                    <div className="performance-table-scroll">
-                      <table className="performance-table">
-                        <thead><tr><th>Category</th><th>Net sales</th><th>Gross profit</th><th>Margin</th></tr></thead>
-                        <tbody>{profitByCategory.slice(0, 8).map((category) => (
-                          <tr key={category.category}>
-                            <th scope="row">{category.category}</th>
-                            <td>{formatKsh(toKsh(category.net_revenue))}</td>
-                            <td>{Number(category.cost_coverage_rate || 0) <= 0 ? "—" : formatKsh(toKsh(category.gross_profit))}</td>
-                            <td>{Number(category.cost_coverage_rate || 0) <= 0 || category.margin_rate == null ? "—" : `${Number(category.margin_rate).toFixed(1)}%`}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  )}
-              {!loading && current?.cost_coverage_rate != null && Number(current.costed_units || 0) > 0 && (
-                <p className="performance-data-note">Cost coverage: {Number(current.cost_coverage_rate).toFixed(1)}% of sold units.</p>
-              )}
-            </section>
-
-            <section className="performance-panel performance-panel--cashiers">
-              <div className="performance-panel-heading">
-                <div><h2>Cashier performance</h2><p>Revenue, returns, and sales per worked hour</p></div>
-                <NavLink to="/manager/cashiers">Manage cashiers <span aria-hidden="true">→</span></NavLink>
-              </div>
-              {loading ? <p className="performance-empty">Loading cashier performance…</p>
-                : !cashierPerformance.length ? <p className="performance-empty">No cashiers registered.</p>
-                  : (
-                    <div className="performance-table-scroll">
-                      <table className="performance-table performance-table--cashiers">
-                        <thead><tr><th>Cashier</th><th>Net sales</th><th>Sales</th><th>Avg sale</th><th>Refunds</th><th>Sales / hour</th></tr></thead>
-                        <tbody>{cashierPerformance.map((cashier) => (
-                          <tr key={cashier.user_id}>
-                            <th scope="row">{cashier.name || cashier.username}</th>
-                            <td>{formatKsh(toKsh(cashier.net_sales))}</td>
-                            <td>{Number(cashier.transaction_count || 0).toLocaleString("en-KE")}</td>
-                            <td>{formatKsh(toKsh(cashier.average_sale))}</td>
-                            <td>{cashier.refund_rate == null ? "—" : `${formatKsh(toKsh(cashier.refund_total))} · ${Number(cashier.refund_rate).toFixed(1)}%`}</td>
-                            <td title={`${Number(cashier.hours_worked || 0).toFixed(1)} shift hours`}>{cashier.sales_per_hour == null ? "—" : formatKsh(toKsh(cashier.sales_per_hour))}</td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </div>
-                  )}
-            </section>
-
             <section className="performance-panel performance-panel--activity">
               <div className="performance-panel-heading">
                 <div><h2>When sales happen</h2><p>Net sales by Nairobi weekday and hour</p></div>
@@ -534,6 +456,88 @@ function ManagerDashboard() {
                   )}
             </section>
 
+            <section className="performance-panel performance-panel--payments">
+              <div className="performance-panel-heading">
+                <div><h2>Payment methods</h2><p>Net sales share and transaction count</p></div>
+              </div>
+              {loading ? <p className="performance-empty">Loading payment summary…</p>
+                : !data?.payment_methods?.length ? <p className="performance-empty">No payments in this period.</p>
+                  : <PaymentMethodChart rows={data.payment_methods} />}
+            </section>
+
+            <section className="performance-panel performance-panel--products">
+              <div className="performance-panel-heading">
+                <div><h2>Best-selling products</h2><p>Units kept after returns, with profit contribution</p></div>
+                <NavLink to="/manager/products">Inventory <span aria-hidden="true">→</span></NavLink>
+              </div>
+              {loading ? <p className="performance-empty">Loading product sales…</p>
+                : !bestSellers.length ? <p className="performance-empty">No product sales in this period.</p>
+                  : (
+                    <RankingBars
+                      rows={bestSellers.slice(0, 8)}
+                      getLabel={(product) => product.product_title}
+                      getValue={(product) => Number(product.units_sold || 0)}
+                      formatValue={(_product, value) => `${value.toLocaleString("en-KE")} units`}
+                      getDetail={(product) => `${formatKsh(toKsh(product.net_revenue))} net sales · ${Number(product.cost_coverage_rate || 0) <= 0 ? "profit unavailable" : `${formatKsh(toKsh(product.gross_profit))} gross profit`}`}
+                    />
+                  )}
+              {!loading && profitProducts.length > 0 && (
+                <>
+                  <h3 className="performance-chart-subtitle">Highest gross profit contribution</h3>
+                  <RankingBars
+                    color="green"
+                    rows={profitProducts.slice(0, 5)}
+                    getLabel={(product) => product.product_title}
+                    getValue={(product) => toKsh(product.gross_profit)}
+                    formatValue={(product) => formatKsh(toKsh(product.gross_profit))}
+                    getDetail={(product) => `${product.margin_rate == null ? "Margin unavailable" : `${Number(product.margin_rate).toFixed(1)}% margin`} · ${product.cost_coverage_rate == null ? "cost coverage unavailable" : `${Number(product.cost_coverage_rate).toFixed(0)}% cost coverage`}`}
+                  />
+                </>
+              )}
+              {!loading && data?.current?.items_without_cost > 0 && (
+                <p className="performance-data-note">Profit omits {Number(data.current.items_without_cost).toLocaleString("en-KE")} sold units without a recorded cost.</p>
+              )}
+            </section>
+
+            <section className="performance-panel performance-panel--categories">
+              <div className="performance-panel-heading">
+                <div><h2>Profit by category</h2><p>Net revenue and margin from recorded item costs</p></div>
+              </div>
+              {loading ? <p className="performance-empty">Loading category margin…</p>
+                : !profitByCategory.length ? <p className="performance-empty">No category sales in this period.</p>
+                  : (
+                    <RankingBars
+                      color="green"
+                      rows={profitByCategory.slice(0, 8)}
+                      getLabel={(category) => category.category}
+                      getValue={(category) => toKsh(category.gross_profit)}
+                      formatValue={(category) => Number(category.cost_coverage_rate || 0) <= 0 ? "Profit —" : formatKsh(toKsh(category.gross_profit))}
+                      getDetail={(category) => `${formatKsh(toKsh(category.net_revenue))} net sales · ${Number(category.cost_coverage_rate || 0) <= 0 || category.margin_rate == null ? "margin unavailable" : `${Number(category.margin_rate).toFixed(1)}% margin`}`}
+                    />
+                  )}
+              {!loading && current?.cost_coverage_rate != null && Number(current.costed_units || 0) > 0 && (
+                <p className="performance-data-note">Cost coverage: {Number(current.cost_coverage_rate).toFixed(1)}% of sold units.</p>
+              )}
+            </section>
+
+            <section className="performance-panel performance-panel--cashiers">
+              <div className="performance-panel-heading">
+                <div><h2>Cashier performance</h2><p>Revenue, returns, and sales per worked hour</p></div>
+                <NavLink to="/manager/cashiers">Manage cashiers <span aria-hidden="true">→</span></NavLink>
+              </div>
+              {loading ? <p className="performance-empty">Loading cashier performance…</p>
+                : !cashierPerformance.length ? <p className="performance-empty">No cashiers registered.</p>
+                  : (
+                    <RankingBars
+                      rows={cashierPerformance.slice().sort((left, right) => toKsh(right.net_sales) - toKsh(left.net_sales))}
+                      getLabel={(cashier) => cashier.name || cashier.username}
+                      getValue={(cashier) => toKsh(cashier.net_sales)}
+                      formatValue={(_cashier, value) => formatKsh(value)}
+                      getDetail={(cashier) => `${Number(cashier.transaction_count || 0).toLocaleString("en-KE")} sales · avg ${formatKsh(toKsh(cashier.average_sale))} · ${cashier.sales_per_hour == null ? "sales/hour —" : `${formatKsh(toKsh(cashier.sales_per_hour))}/hour`}`}
+                    />
+                  )}
+            </section>
+
             <section className="performance-panel performance-panel--stock">
               <div className="performance-panel-heading">
                 <div><h2>Inventory health</h2><p>Current stock valuation and 30-day demand</p></div>
@@ -548,19 +552,19 @@ function ManagerDashboard() {
               {loading ? <p className="performance-empty performance-empty--compact">Loading stock levels…</p>
                 : !inventory?.low_stock_products?.length ? <p className="performance-empty performance-empty--compact">All active products are above their low-stock thresholds.</p>
                   : (
-                    <div className="performance-table-scroll">
-                      <table className="performance-table">
-                        <thead><tr><th>Product</th><th>In stock</th><th>30-day sales</th><th>Days cover</th><th>Status</th></tr></thead>
-                        <tbody>{inventory.low_stock_products.map((product) => (
-                          <tr key={product.product_id}>
-                            <th scope="row">{product.product_title}</th>
-                            <td>{product.stock_quantity} / {product.low_stock_threshold} min</td>
-                            <td>{product.units_sold_30d}</td>
-                            <td>{product.days_cover == null ? "No recent sales" : `${Number(product.days_cover).toFixed(1)} days`}</td>
-                            <td><span className={`performance-stock-alert${product.stock_quantity === 0 ? " is-out" : ""}`}>{product.stock_quantity === 0 ? "Out of stock" : "Reorder"}</span></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
+                    <div className="performance-low-stock-list">
+                      {inventory.low_stock_products.map((product) => {
+                        const stockPercent = product.low_stock_threshold > 0
+                          ? Math.min((product.stock_quantity / product.low_stock_threshold) * 100, 100)
+                          : 0;
+                        return (
+                          <article className="performance-low-stock-row" key={product.product_id}>
+                            <div className="performance-ranking-heading"><strong title={product.product_title}>{product.product_title}</strong><span>{product.stock_quantity} / {product.low_stock_threshold} min</span></div>
+                            <div className="performance-bar-track"><span className={product.stock_quantity === 0 ? "is-out" : ""} style={{ width: `${stockPercent}%` }} /></div>
+                            <small>{product.units_sold_30d} sold in 30 days · {product.days_cover == null ? "no recent sales" : `${Number(product.days_cover).toFixed(1)} days cover`}</small>
+                          </article>
+                        );
+                      })}
                     </div>
                   )}
             </section>
@@ -593,20 +597,16 @@ function ManagerDashboard() {
               {loading ? null : !shifts?.recent_closed_shifts?.length
                 ? <p className="performance-empty performance-empty--compact">No shifts closed in this period.</p>
                 : (
-                  <div className="performance-table-scroll">
-                    <table className="performance-table">
-                      <thead><tr><th>Cashier</th><th>Closed</th><th>Variance</th></tr></thead>
-                      <tbody>{shifts.recent_closed_shifts.map((shift) => {
-                        const variance = Number(shift.cash_variance || 0);
-                        return (
-                          <tr key={shift.shift_id}>
-                            <th scope="row">{shift.cashier}</th>
-                            <td>{formatDateTime(shift.closed_at)}</td>
-                            <td className={variance < 0 ? "has-alert" : ""}>{variance < 0 ? "Short " : variance > 0 ? "Over " : "Balanced "}{formatKsh(Math.abs(toKsh(variance)))}</td>
-                          </tr>
-                        );
-                      })}</tbody>
-                    </table>
+                  <div className="performance-shift-list">
+                    {shifts.recent_closed_shifts.map((shift) => {
+                      const variance = Number(shift.cash_variance || 0);
+                      return (
+                        <div className="performance-shift-row" key={shift.shift_id}>
+                          <div><strong>{shift.cashier}</strong><small>Closed {formatDateTime(shift.closed_at)}</small></div>
+                          <span className={variance < 0 ? "has-alert" : ""}>{variance < 0 ? "Short " : variance > 0 ? "Over " : "Balanced "}{formatKsh(Math.abs(toKsh(variance)))}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
             </section>

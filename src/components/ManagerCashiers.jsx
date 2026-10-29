@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../api/client";
+import { showManagerSuccess } from "../utils/managerToast";
 
 const passwordMeetsRequirements = (password) =>
   Array.from(password).length >= 8 &&
@@ -66,6 +67,7 @@ function ManagerCashiers() {
       setNewPassword("");
       setError("");
       await loadCashiers();
+      showManagerSuccess(`Cashier ${name} registered successfully.`);
     } catch (err) {
       const details = err.data && err.data.errors;
       setError(
